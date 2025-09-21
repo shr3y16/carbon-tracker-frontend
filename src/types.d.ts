@@ -18,3 +18,11 @@ interface FetchActivitiesParams {
   sortBy?: SortBy;
   sortOrder?: SortOrder;
 }
+
+export interface ActivityInput {
+    category: string;
+    description: string;
+    emission: number;
+    date: string;
+    id?: number; // Optional for updates
+}

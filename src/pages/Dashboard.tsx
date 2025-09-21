@@ -1,9 +1,15 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { fetchActivities } from "@/services/activityService";
 import { useAuthStore } from "@/store/auth";
 import { SortBy, SortOrder } from "@/enums";
+import SummaryPanel from "@/components/SummaryPanel";
+import SearchControls from "@/components/SearchControls";
+import ActivitiesTable from "@/components/ActivitiesTable";
+import Pagination from "@/components/Pagination";
+import { useActivities, useAddActivity, useSummary, useUpdateActivity } from "@/hooks/useActivities";
+import { Button } from "@/components/ui/button";
+import { ActivityModal } from "@/components/AddActivityModal";
+import type { ActivityInput } from "@/types";
 
 export default function Dashboard() {
   const [search, setSearch] = useState("");
@@ -11,24 +17,22 @@ export default function Dashboard() {
   const [limit, setLimit] = useState(10);
   const [sortBy, setSortBy] = useState<SortBy>(SortBy.DATE);
   const [sortOrder, setSortOrder] = useState<SortOrder>(SortOrder.DESC);
-
+  const [isAddOpen, setIsAddOpen] = useState(false);
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [editData, setEditData] = useState<ActivityInput & { id: string } | null>(null);
   const setToken = useAuthStore((s) => s.setToken);
 
   // Fetch activities
-  const { data: activities, isPending: isActivitiesPending, refetch } = useQuery({
-    queryKey: ["activities", search, page, limit, sortBy, sortOrder],
-    queryFn: () => fetchActivities({ search, page, limit, sortBy, sortOrder }),
-  });
+  const { data: activities, isPending: isActivitiesPending, refetch } = useActivities({ search, page, limit, sortBy, sortOrder });
 
   // Fetch summary
-//   const { data: summary, isPending: isSummaryPending } = useQuery({
-//     queryKey: ["summary"],
-//     queryFn: fetchSummary,
-//   });
+  const { data: summary, isPending: isSummaryPending } = useSummary();
+
+  const { mutate: createActivity, isPending: isAdding } = useAddActivity();
+  const { mutate: updateActivity, isPending: isUpdating } = useUpdateActivity();
 
   const handleLogout = () => {
     setToken(null);
-    // optionally redirect to /login
   };
 
   const handleSortChange = (field: SortBy) => {
@@ -40,6 +44,11 @@ export default function Dashboard() {
     }
     setPage(1);
     refetch();
+  };
+
+  const handleEditClick = (activity: any) => {
+    setEditData(activity);
+    setIsEditOpen(true);
   };
 
   return (
@@ -54,113 +63,59 @@ export default function Dashboard() {
         </button>
       </div>
 
-      {/* Summary Panel */}
-      {/* {isSummaryPending ? (
-        <p>Loading summary...</p>
-      ) : (
-        <div className="mb-6 p-4 bg-gray-100 rounded shadow">
-          <h2 className="text-xl font-semibold mb-2">Summary</h2>
-          <p>Total Emission: {summary?.totalEmission || 0}</p>
-          <p>Activities Count: {summary?.totalActivities || 0}</p>
-          {summary?.byCategory && (
-            <div className="mt-2">
-              {Object.entries(summary.byCategory).map(([cat, value]) => (
-                <p key={cat}>
-                  {cat}: {value}
-                </p>
-              ))}
-            </div>
-          )}
-        </div>
-      )} */}
+      <SummaryPanel summary={summary} isLoading={isSummaryPending} />
 
-      {/* Search & controls */}
-      <div className="mb-4 flex gap-2 flex-wrap">
-        <input
-          type="text"
-          placeholder="Search activities..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="border p-2 rounded flex-1"
-        />
-        <button
-          className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
-          onClick={() => { setPage(1); refetch(); }}
-        >
-          Search
-        </button>
+      <SearchControls
+        search={search}
+        setSearch={setSearch}
+        limit={limit}
+        setLimit={setLimit}
+        onSearch={() => {
+          setPage(1);
+          refetch();
+        }}
+      />
 
-        <select
-          value={limit}
-          onChange={(e) => { setLimit(Number(e.target.value)); setPage(1); refetch(); }}
-          className="border p-2 rounded"
-        >
-          {[5, 10, 20, 50].map((l) => (
-            <option key={l} value={l}>{l} per page</option>
-          ))}
-        </select>
-      </div>
+      <Button onClick={() => setIsAddOpen(true)}>Add Activity</Button>
 
-      {/* Activities Table */}
+      <ActivityModal
+        open={isAddOpen}
+        onClose={() => setIsAddOpen(false)}
+        onSubmit={(data: ActivityInput) => createActivity(data)}
+        isSubmitting={isAdding}
+        mode="add"
+      />
+
+      <ActivityModal
+        open={isEditOpen}
+        onClose={() => setIsEditOpen(false)}
+        onSubmit={(data: any) => {
+          if (editData) {
+            updateActivity({ id: editData.id, updates: data });
+          }
+        }}
+        isSubmitting={isUpdating}
+        initialData={editData ?? undefined}
+        mode="edit"
+      />
+
       {isActivitiesPending ? (
         <p>Loading activities...</p>
       ) : (
-        <table className="w-full border-collapse border border-gray-300">
-          <thead>
-            <tr className="bg-gray-200">
-              <th className="border p-2">ID</th>
-              <th
-                className="border p-2 cursor-pointer"
-                onClick={() => handleSortChange(SortBy.CATEGORY)}
-              >
-                Category {sortBy === SortBy.CATEGORY ? (sortOrder === SortOrder.ASC ? "↑" : "↓") : ""}
-              </th>
-              <th className="border p-2">Description</th>
-              <th
-                className="border p-2 cursor-pointer"
-                onClick={() => handleSortChange(SortBy.EMISSION)}
-              >
-                Emission {sortBy === SortBy.EMISSION ? (sortOrder === SortOrder.ASC ? "↑" : "↓") : ""}
-              </th>
-              <th
-                className="border p-2 cursor-pointer"
-                onClick={() => handleSortChange(SortBy.DATE)}
-              >
-                Date {sortBy === SortBy.DATE ? (sortOrder === SortOrder.ASC ? "↑" : "↓") : ""}
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {activities?.data?.map((a: any) => (
-              <tr key={a.id}>
-                <td className="border p-2">{a.id}</td>
-                <td className="border p-2">{a.category}</td>
-                <td className="border p-2">{a.description}</td>
-                <td className="border p-2">{a.emission}</td>
-                <td className="border p-2">{new Date(a.date).toLocaleDateString()}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <ActivitiesTable
+          activities={activities?.data || []}
+          sortBy={sortBy}
+          sortOrder={sortOrder}
+          onSortChange={handleSortChange}
+          onEditClick={handleEditClick} // Pass edit handler
+        />
       )}
 
-      {/* Pagination */}
-      <div className="flex justify-between items-center mt-4">
-        <button
-          disabled={page === 1}
-          className="bg-gray-300 px-4 py-2 rounded hover:bg-gray-400 disabled:opacity-50"
-          onClick={() => setPage((p) => Math.max(1, p - 1))}
-        >
-          Prev
-        </button>
-        <span>Page {page}</span>
-        <button
-          className="bg-gray-300 px-4 py-2 rounded hover:bg-gray-400"
-          onClick={() => setPage((p) => p + 1)}
-        >
-          Next
-        </button>
-      </div>
+    <Pagination
+      page={page}
+      onPageChange={setPage}
+      hasNextPage={activities?.pagination.page < activities?.pagination.pages} // Correct calculation
+    />
     </div>
   );
 }

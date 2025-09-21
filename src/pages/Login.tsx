@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useMutation } from "@tanstack/react-query";
 import { login } from "@/services/authService";
-import { useState } from "react";
+import { useState, type FormEvent } from "react";
 import { useNavigate
 
  } from "react-router-dom";
@@ -24,7 +24,7 @@ export default function Login() {
     },
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
     mutation.mutate();
   };
@@ -58,7 +58,7 @@ export default function Login() {
         <button
           type="submit"
           className="w-full bg-blue-600 text-white p-2 rounded hover:bg-blue-700"
-          disabled={mutation.isPending}  // ✅ now recognized
+          disabled={mutation.isPending}
         >
           {mutation.isPending ? "Logging in..." : "Login"}
         </button>
